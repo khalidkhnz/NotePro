@@ -24,12 +24,34 @@ export const metadata: Metadata = {
   description: "Create a new note",
 };
 
-export default async function NewNotePage() {
+type SearchParams = {
+  categoryId?: string;
+};
+
+export default async function NewNotePage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const session = await auth();
 
   // Redirect to sign in if not logged in
   if (!session?.user) {
     redirect("/auth/signin");
+  }
+
+  // Get category ID from search params if it exists
+  const selectedCategoryId = searchParams.categoryId;
+
+  // Verify if the category exists and belongs to the user
+  let preselectedCategory = null;
+  if (selectedCategoryId) {
+    preselectedCategory = await db.category.findUnique({
+      where: {
+        id: selectedCategoryId,
+        userId: session.user.id,
+      },
+    });
   }
 
   // Get user's categories
@@ -125,7 +147,12 @@ export default async function NewNotePage() {
 
             <div className="space-y-2">
               <Label htmlFor="categoryId">Category</Label>
-              <Select name="categoryId" defaultValue="none">
+              <Select
+                name="categoryId"
+                defaultValue={
+                  preselectedCategory ? preselectedCategory.id : "none"
+                }
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
@@ -146,6 +173,11 @@ export default async function NewNotePage() {
                   ))}
                 </SelectContent>
               </Select>
+              {preselectedCategory && (
+                <p className="text-muted-foreground text-xs">
+                  Pre-selected category: {preselectedCategory.name}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-8">

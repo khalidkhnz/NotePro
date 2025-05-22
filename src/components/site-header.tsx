@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BookText,
+  FilterIcon,
   Home,
   LogOut,
   Menu,
@@ -144,6 +145,12 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                       Categories
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/notes/filter">
+                      <FilterIcon className="mr-2 h-4 w-4" />
+                      Filter Notes
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
@@ -220,6 +227,17 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                       >
                         <FolderIcon className="h-4 w-4" />
                         Categories
+                      </Link>
+                      <Link
+                        href="/dashboard/notes/filter"
+                        className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                          isActive("/dashboard/notes/filter")
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        }`}
+                      >
+                        <FilterIcon className="h-4 w-4" />
+                        Filter Notes
                       </Link>
                     </>
                   )}

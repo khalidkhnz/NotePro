@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { FolderIcon, Plus, PinIcon } from "lucide-react";
+import { FolderIcon, FilterIcon, Plus, PinIcon } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { auth } from "~/server/auth";
@@ -75,6 +75,12 @@ export default async function DashboardPage() {
             <Button variant="outline" className="gap-1">
               <FolderIcon className="h-4 w-4" />
               Categories
+            </Button>
+          </Link>
+          <Link href="/dashboard/notes/filter">
+            <Button variant="outline" className="gap-1">
+              <FilterIcon className="h-4 w-4" />
+              Filter Notes
             </Button>
           </Link>
           <Link href="/dashboard/notes/new">
