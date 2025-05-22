@@ -22,11 +22,6 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
-export const metadata = {
-  title: "Edit Note",
-  description: "Edit your note",
-};
-
 function SubmitButton() {
   const { pending } = useFormStatus();
 
