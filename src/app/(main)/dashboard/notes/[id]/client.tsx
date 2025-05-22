@@ -30,6 +30,11 @@ export default function NotePageClient({
     content: string;
     isPublic: boolean;
     updatedAt: Date;
+    category?: {
+      id: string;
+      name: string;
+      color: string | null;
+    } | null;
   };
   userId: string;
 }) {
@@ -49,11 +54,12 @@ export default function NotePageClient({
 
   const togglePublic = async () => {
     try {
-      const response = await fetch(`/api/notes/${note.id}/toggle-public`, {
+      const response = await fetch(`/api/notes/${note.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ isPublic: !note.isPublic }),
       });
 
       if (!response.ok) {
@@ -150,13 +156,27 @@ export default function NotePageClient({
           </div>
 
           <div className="text-muted-foreground flex items-center text-sm">
+            {note.category && (
+              <div className="mr-4 flex items-center gap-1">
+                <div
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{
+                    backgroundColor: note.category.color || "#94a3b8",
+                  }}
+                />
+                <span>{note.category.name}</span>
+              </div>
+            )}
             <time dateTime={note.updatedAt.toISOString()}>
               Last updated on {new Date(note.updatedAt).toLocaleDateString()}
             </time>
           </div>
 
           <div className="prose prose-gray dark:prose-invert max-w-none">
-            <div className="whitespace-pre-wrap">{note.content}</div>
+            <div
+              className="ql-editor"
+              dangerouslySetInnerHTML={{ __html: note.content }}
+            />
           </div>
 
           {note.isPublic && (
@@ -166,7 +186,7 @@ export default function NotePageClient({
                 This note is public. Share the link below:
               </p>
               <div className="bg-muted flex flex-col items-center justify-between gap-3 rounded-md p-3 sm:flex-row">
-                <code className="w-full text-sm break-all">
+                <code className="text-sm break-all">
                   {typeof window !== "undefined"
                     ? `${window.location.origin}/notes/${note.id}`
                     : `/notes/${note.id}`}

@@ -72,3 +72,52 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function GET(request: Request) {
+  try {
+    const session = await auth();
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    const searchParams = url.searchParams;
+    const query = searchParams.get("q") || "";
+
+    // Build query conditions
+    const whereConditions: any = {
+      userId: session.user.id,
+    };
+
+    if (query) {
+      whereConditions.OR = [
+        { name: { contains: query } },
+        { description: { contains: query } },
+      ];
+    }
+
+    // Get categories
+    const categories = await db.category.findMany({
+      where: whereConditions,
+      orderBy: {
+        name: "asc",
+      },
+      include: {
+        _count: {
+          select: {
+            notes: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(categories);
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch categories" },
+      { status: 500 },
+    );
+  }
+}

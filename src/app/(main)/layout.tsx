@@ -1,5 +1,20 @@
-import { SiteHeader } from "~/components/site-header";
+import { Inter } from "next/font/google";
+import type { Metadata } from "next";
+
 import { auth } from "~/server/auth";
+import { SiteHeader } from "~/components/site-header";
+import { SiteFooter } from "~/components/site-footer";
+
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: {
+    default: "NotePro",
+    template: "%s | NotePro",
+  },
+  description: "A modern notes application built with Next.js",
+  keywords: ["notes", "note-taking", "next.js", "react"],
+};
 
 export default async function MainLayout({
   children,
@@ -9,16 +24,10 @@ export default async function MainLayout({
   const session = await auth();
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col">
-      <SiteHeader user={session?.user || null} />
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader user={session?.user as any} />
       <main className="flex-1">{children}</main>
-      <footer className="border-t py-6 md:py-0">
-        <div className="container mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 sm:px-6 md:h-16 md:flex-row lg:px-8">
-          <p className="text-muted-foreground text-center text-sm leading-loose md:text-left">
-            © {new Date().getFullYear()} NotePro. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
