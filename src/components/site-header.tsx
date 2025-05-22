@@ -2,11 +2,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookText, LogOut, Menu, UserCircle } from "lucide-react";
+import {
+  BookText,
+  Home,
+  LogOut,
+  Menu,
+  UserCircle,
+  Users,
+  FilePlus,
+  FolderIcon,
+} from "lucide-react";
 
 import { ModeToggle } from "./toggle-dark-light-mode";
 import { Button } from "./ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +50,10 @@ export function SiteHeader({ user }: SiteHeaderProps) {
   };
 
   const isActive = (path: string) => {
-    return pathname === path;
+    if (path === "/") {
+      return pathname === path;
+    }
+    return pathname === path || pathname.startsWith(path);
   };
 
   return (
@@ -61,7 +79,7 @@ export function SiteHeader({ user }: SiteHeaderProps) {
               <Link
                 href="/dashboard"
                 className={`flex items-center text-sm font-medium ${
-                  isActive("/dashboard") || pathname.startsWith("/dashboard")
+                  isActive("/dashboard")
                     ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -72,7 +90,7 @@ export function SiteHeader({ user }: SiteHeaderProps) {
             <Link
               href="/notes/public"
               className={`flex items-center text-sm font-medium ${
-                isActive("/notes/public") || pathname.startsWith("/notes/")
+                isActive("/notes/public")
                   ? "text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
@@ -109,8 +127,24 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard">Dashboard</Link>
+                    <Link href="/dashboard">
+                      <Home className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/notes/new">
+                      <FilePlus className="mr-2 h-4 w-4" />
+                      New Note
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/categories">
+                      <FolderIcon className="mr-2 h-4 w-4" />
+                      Categories
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Sign Out</span>
@@ -132,38 +166,103 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                   <span className="sr-only">Toggle Menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right">
+              <SheetContent side="right" className="w-[250px] sm:w-[300px]">
+                <SheetHeader className="border-b pb-4">
+                  <SheetTitle className="flex items-center">
+                    <BookText className="mr-2 h-5 w-5" />
+                    NotePro
+                  </SheetTitle>
+                </SheetHeader>
                 <nav className="mt-6 flex flex-col gap-4">
                   <Link
                     href="/"
-                    className="flex items-center text-sm font-medium"
+                    className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                      isActive("/")
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    }`}
                   >
+                    <Home className="h-4 w-4" />
                     Home
                   </Link>
+
                   {user && (
-                    <Link
-                      href="/dashboard"
-                      className="flex items-center text-sm font-medium"
-                    >
-                      Dashboard
-                    </Link>
+                    <>
+                      <Link
+                        href="/dashboard"
+                        className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                          isActive("/dashboard")
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        }`}
+                      >
+                        <UserCircle className="h-4 w-4" />
+                        Dashboard
+                      </Link>
+                      <Link
+                        href="/dashboard/notes/new"
+                        className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                          isActive("/dashboard/notes/new")
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        }`}
+                      >
+                        <FilePlus className="h-4 w-4" />
+                        Create Note
+                      </Link>
+                      <Link
+                        href="/dashboard/categories"
+                        className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                          isActive("/dashboard/categories")
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        }`}
+                      >
+                        <FolderIcon className="h-4 w-4" />
+                        Categories
+                      </Link>
+                    </>
                   )}
+
                   <Link
                     href="/notes/public"
-                    className="flex items-center text-sm font-medium"
+                    className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                      isActive("/notes/public")
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    }`}
                   >
+                    <Users className="h-4 w-4" />
                     Public Notes
                   </Link>
-                  {!user && (
-                    <Button
-                      asChild
-                      variant="default"
-                      size="sm"
-                      className="mt-4"
-                    >
-                      <Link href="/auth/signin">Sign In</Link>
-                    </Button>
+
+                  {user ? (
+                    <div className="mt-4 border-t pt-4">
+                      <Button
+                        onClick={handleSignOut}
+                        className="w-full justify-start"
+                        variant="ghost"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-4 border-t pt-4">
+                      <Button
+                        asChild
+                        variant="default"
+                        size="sm"
+                        className="w-full"
+                      >
+                        <Link href="/auth/signin">Sign In</Link>
+                      </Button>
+                    </div>
                   )}
+
+                  <div className="mt-4 flex justify-center">
+                    <ModeToggle />
+                  </div>
                 </nav>
               </SheetContent>
             </Sheet>

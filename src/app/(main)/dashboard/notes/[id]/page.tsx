@@ -35,10 +35,13 @@ export default async function NotePage({ params }: { params: { id: string } }) {
     return notFound();
   }
 
-  // Get the note
+  // Get the note with category
   const note = await db.note.findUnique({
     where: {
       id: params.id,
+    },
+    include: {
+      category: true,
     },
   });
 

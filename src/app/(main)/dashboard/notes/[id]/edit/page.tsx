@@ -11,6 +11,13 @@ import { Switch } from "~/components/ui/switch";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 
 export async function generateMetadata({
   params,
@@ -51,6 +58,19 @@ export default async function EditNotePage({
     where: {
       id: params.id,
     },
+    include: {
+      category: true,
+    },
+  });
+
+  // Get user's categories
+  const categories = await db.category.findMany({
+    where: {
+      userId: session.user.id,
+    },
+    orderBy: {
+      name: "asc",
+    },
   });
 
   // Check if note exists and belongs to the user
@@ -69,7 +89,11 @@ export default async function EditNotePage({
     const title = formData.get("title") as string;
     const content = formData.get("content") as string;
     const isPublicValue = formData.get("isPublic");
+    const isPinnedValue = formData.get("isPinned");
+    const categoryId = formData.get("categoryId") as string;
+
     const isPublic = isPublicValue === "on";
+    const isPinned = isPinnedValue === "on";
 
     // Check if note exists and belongs to the user
     const noteToUpdate = await db.note.findUnique({
@@ -88,6 +112,8 @@ export default async function EditNotePage({
           title,
           content,
           isPublic,
+          isPinned,
+          categoryId: categoryId === "none" ? null : categoryId || null,
         },
       });
 
@@ -140,13 +166,52 @@ export default async function EditNotePage({
               />
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="isPublic"
-                name="isPublic"
-                defaultChecked={note.isPublic}
-              />
-              <Label htmlFor="isPublic">Make this note public</Label>
+            <div className="space-y-2">
+              <Label htmlFor="categoryId">Category</Label>
+              <Select
+                name="categoryId"
+                defaultValue={note.categoryId || "none"}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-2 w-2 rounded-full"
+                          style={{
+                            backgroundColor: category.color || "#94a3b8",
+                          }}
+                        />
+                        {category.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-8">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="isPublic"
+                  name="isPublic"
+                  defaultChecked={note.isPublic}
+                />
+                <Label htmlFor="isPublic">Make this note public</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="isPinned"
+                  name="isPinned"
+                  defaultChecked={note.isPinned}
+                />
+                <Label htmlFor="isPinned">Pin this note</Label>
+              </div>
             </div>
 
             <div className="flex flex-wrap justify-end gap-4">

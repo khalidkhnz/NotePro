@@ -31,14 +31,68 @@ model Note {
     title       String
     content     String
     isPublic    Boolean  @default(false)
+    isPinned    Boolean  @default(false)
+    color       String?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
     
     user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     userId      String
     
+    category    Category? @relation(fields: [categoryId], references: [id])
+    categoryId  String?
+    
+    tags        TagsOnNotes[]
+    
     @@index([userId])
     @@index([isPublic])
+    @@index([isPinned])
+    @@index([categoryId])
+}
+
+model Category {
+    id          String   @id @default(cuid())
+    name        String
+    description String?
+    color       String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+    
+    user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    userId      String
+    
+    notes       Note[]
+    
+    @@unique([name, userId])
+    @@index([userId])
+}
+
+model Tag {
+    id          String   @id @default(cuid())
+    name        String
+    color       String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+    
+    user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    userId      String
+    
+    notes       TagsOnNotes[]
+    
+    @@unique([name, userId])
+    @@index([userId])
+}
+
+model TagsOnNotes {
+    note        Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+    noteId      String
+    
+    tag         Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+    tagId       String
+    
+    assignedAt  DateTime @default(now())
+    
+    @@id([noteId, tagId])
 }
 
 // Necessary for Next auth
@@ -80,6 +134,8 @@ model User {
     sessions      Session[]
     posts         Post[]
     notes         Note[]
+    categories    Category[]
+    tags          Tag[]
 }
 
 model VerificationToken {
