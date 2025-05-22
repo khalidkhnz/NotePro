@@ -4,7 +4,7 @@ import { db } from "~/server/db";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth();
@@ -13,9 +13,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const noteId = (await params).id;
+
     const note = await db.note.findUnique({
       where: {
-        id: params.id,
+        id: noteId,
       },
     });
 
@@ -29,7 +31,7 @@ export async function PATCH(
 
     const updatedNote = await db.note.update({
       where: {
-        id: params.id,
+        id: noteId,
       },
       data: {
         isPublic: !note.isPublic,

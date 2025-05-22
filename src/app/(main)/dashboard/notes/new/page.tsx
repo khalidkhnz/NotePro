@@ -31,7 +31,7 @@ type SearchParams = {
 export default async function NewNotePage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
 
@@ -41,7 +41,7 @@ export default async function NewNotePage({
   }
 
   // Get category ID from search params if it exists
-  const selectedCategoryId = searchParams.categoryId;
+  const selectedCategoryId = (await searchParams).categoryId;
 
   // Verify if the category exists and belongs to the user
   let preselectedCategory = null;

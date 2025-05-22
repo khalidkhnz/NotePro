@@ -12,7 +12,7 @@ const updateCategorySchema = z.object({
 // GET handler - Get a single category
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth();
@@ -21,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const categoryId = params.id;
+    const categoryId = (await params).id;
 
     // Fetch category and ensure it belongs to the user
     const category = await db.category.findUnique({
@@ -50,7 +50,7 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth();
@@ -59,7 +59,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const categoryId = params.id;
+    const categoryId = (await params).id;
 
     // Verify category exists and belongs to the user
     const category = await db.category.findUnique({
@@ -138,7 +138,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth();
@@ -147,7 +147,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const categoryId = params.id;
+    const categoryId = (await params).id;
 
     // Verify category exists and belongs to the user
     const category = await db.category.findUnique({

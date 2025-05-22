@@ -30,8 +30,13 @@ const signUpSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-export default async function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await auth();
+  const params = await searchParams;
 
   // Redirect to dashboard if already signed in
   if (session?.user) {
@@ -110,6 +115,20 @@ export default async function SignUpPage() {
           <CardDescription className="text-center">
             Enter your information to create an account
           </CardDescription>
+          {params?.error === "ValidationError" && (
+            <div className="bg-destructive/15 rounded-md p-3">
+              <p className="text-destructive text-center text-sm">
+                Please check your information and try again.
+              </p>
+            </div>
+          )}
+          {params?.error === "ServerError" && (
+            <div className="bg-destructive/15 rounded-md p-3">
+              <p className="text-destructive text-center text-sm">
+                Something went wrong. Please try again later.
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-4 px-6">
           <form action={signUp}>

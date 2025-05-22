@@ -12,10 +12,10 @@ import { Pagination } from "~/components/pagination";
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const category = await db.category.findUnique({
-    where: { id: params.id },
+    where: { id: (await params).id },
   });
 
   if (!category) {
@@ -44,8 +44,8 @@ export default async function CategoryNotesPage({
   params,
   searchParams,
 }: {
-  params: { id: string };
-  searchParams: SearchParams;
+  params: Promise<{ id: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
 
@@ -55,8 +55,8 @@ export default async function CategoryNotesPage({
   }
 
   // Parse search params
-  const currentPage = Number(searchParams.page) || 1;
-  const searchQuery = searchParams.q || "";
+  const currentPage = Number((await searchParams).page) || 1;
+  const searchQuery = (await searchParams).q || "";
 
   // Pagination offset
   const skip = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -64,7 +64,7 @@ export default async function CategoryNotesPage({
   // Get the category
   const category = await db.category.findUnique({
     where: {
-      id: params.id,
+      id: (await params).id,
     },
   });
 
@@ -76,7 +76,7 @@ export default async function CategoryNotesPage({
   // Base query for notes
   const whereClause = {
     userId: session.user.id,
-    categoryId: params.id,
+    categoryId: (await params).id,
     ...(searchQuery
       ? {
           OR: [

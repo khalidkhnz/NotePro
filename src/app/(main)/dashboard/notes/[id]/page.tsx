@@ -8,10 +8,10 @@ import NotePageClient from "./client";
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const note = await db.note.findUnique({
-    where: { id: params.id },
+    where: { id: (await params).id },
   });
 
   if (!note) {
@@ -27,7 +27,11 @@ export async function generateMetadata({
   };
 }
 
-export default async function NotePage({ params }: { params: { id: string } }) {
+export default async function NotePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const session = await auth();
 
   // Redirect to sign in if not logged in
@@ -38,7 +42,7 @@ export default async function NotePage({ params }: { params: { id: string } }) {
   // Get the note with category
   const note = await db.note.findUnique({
     where: {
-      id: params.id,
+      id: (await params).id,
     },
     include: {
       category: true,

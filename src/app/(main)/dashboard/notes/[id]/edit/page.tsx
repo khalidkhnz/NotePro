@@ -22,10 +22,10 @@ import {
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const note = await db.note.findUnique({
-    where: { id: params.id },
+    where: { id: (await params).id },
   });
 
   if (!note) {
@@ -44,7 +44,7 @@ export async function generateMetadata({
 export default async function EditNotePage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const session = await auth();
 
@@ -56,7 +56,7 @@ export default async function EditNotePage({
   // Get the note
   const note = await db.note.findUnique({
     where: {
-      id: params.id,
+      id: (await params).id,
     },
     include: {
       category: true,
@@ -97,7 +97,7 @@ export default async function EditNotePage({
 
     // Check if note exists and belongs to the user
     const noteToUpdate = await db.note.findUnique({
-      where: { id: params.id },
+      where: { id: (await params).id },
     });
 
     if (!noteToUpdate || noteToUpdate.userId !== session.user.id) {
@@ -107,7 +107,7 @@ export default async function EditNotePage({
     try {
       // Update the note
       await db.note.update({
-        where: { id: params.id },
+        where: { id: (await params).id },
         data: {
           title,
           content,
@@ -118,17 +118,17 @@ export default async function EditNotePage({
       });
 
       // Redirect to note page with success parameter
-      redirect(`/dashboard/notes/${params.id}?updated=true`);
+      redirect(`/dashboard/notes/${(await params).id}?updated=true`);
     } catch (error) {
       console.error("Error updating note:", error);
-      redirect(`/dashboard/notes/${params.id}/edit?error=true`);
+      redirect(`/dashboard/notes/${(await params).id}/edit?error=true`);
     }
   }
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href={`/dashboard/notes/${params.id}`}>
+        <Link href={`/dashboard/notes/${(await params).id}`}>
           <Button variant="ghost" className="pl-0">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Note
@@ -215,7 +215,7 @@ export default async function EditNotePage({
             </div>
 
             <div className="flex flex-wrap justify-end gap-4">
-              <Link href={`/dashboard/notes/${params.id}`}>
+              <Link href={`/dashboard/notes/${(await params).id}`}>
                 <Button variant="outline">Cancel</Button>
               </Link>
               <Button type="submit">Update Note</Button>

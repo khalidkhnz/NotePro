@@ -26,7 +26,7 @@ interface SearchParams {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
 
@@ -36,8 +36,8 @@ export default async function DashboardPage({
   }
 
   // Parse search params
-  const currentPage = Number(searchParams.page) || 1;
-  const searchQuery = searchParams.q || "";
+  const currentPage = Number((await searchParams).page) || 1;
+  const searchQuery = (await searchParams).q || "";
 
   // Pagination offset
   const skip = (currentPage - 1) * ITEMS_PER_PAGE;

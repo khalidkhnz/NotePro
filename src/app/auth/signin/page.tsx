@@ -24,9 +24,10 @@ export const metadata: Metadata = {
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 }) {
   const session = await auth();
+  const params = await searchParams;
 
   // Redirect to dashboard if already signed in
   if (session?.user) {
@@ -49,7 +50,7 @@ export default async function SignInPage({
           <CardDescription className="text-center">
             Enter your email and password to sign in to your account
           </CardDescription>
-          {searchParams?.error === "EmailAlreadyExists" && (
+          {params?.error === "EmailAlreadyExists" && (
             <div className="bg-destructive/15 rounded-md p-3">
               <p className="text-destructive text-center text-sm">
                 An account with this email already exists. Please sign in
@@ -57,7 +58,7 @@ export default async function SignInPage({
               </p>
             </div>
           )}
-          {searchParams?.error === "CredentialsSignin" && (
+          {params?.error === "CredentialsSignin" && (
             <div className="bg-destructive/15 rounded-md p-3">
               <p className="text-destructive text-center text-sm">
                 Invalid email or password. Please try again.

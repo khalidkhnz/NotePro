@@ -39,7 +39,7 @@ type SearchParams = {
 export default async function FilterNotesPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
 
@@ -50,14 +50,14 @@ export default async function FilterNotesPage({
 
   // Parse search parameters
   const selectedCategoryIds =
-    typeof searchParams.category === "string"
-      ? [searchParams.category]
-      : searchParams.category || [];
+    typeof (await searchParams).category === "string"
+      ? [(await searchParams).category]
+      : (await searchParams).category || [];
 
-  const searchQuery = searchParams.q || "";
-  const showPublic = searchParams.public === "true";
-  const showPinned = searchParams.pinned === "true";
-  const currentPage = Number(searchParams.page) || 1;
+  const searchQuery = (await searchParams).q || "";
+  const showPublic = (await searchParams).public === "true";
+  const showPinned = (await searchParams).pinned === "true";
+  const currentPage = Number((await searchParams).page) || 1;
 
   // Pagination offset
   const skip = (currentPage - 1) * ITEMS_PER_PAGE;

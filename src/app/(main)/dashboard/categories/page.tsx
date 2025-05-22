@@ -27,7 +27,7 @@ interface SearchParams {
 export default async function CategoriesPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
 
@@ -37,8 +37,8 @@ export default async function CategoriesPage({
   }
 
   // Parse search params
-  const currentPage = Number(searchParams.page) || 1;
-  const searchQuery = searchParams.q || "";
+  const currentPage = Number((await searchParams).page) || 1;
+  const searchQuery = (await searchParams).q || "";
 
   // Pagination offset
   const skip = (currentPage - 1) * ITEMS_PER_PAGE;

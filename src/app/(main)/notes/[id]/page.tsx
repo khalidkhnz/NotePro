@@ -10,10 +10,10 @@ import { db } from "~/server/db";
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const note = await db.note.findUnique({
-    where: { id: params.id },
+    where: { id: (await params).id },
     include: {
       user: {
         select: {
@@ -39,14 +39,14 @@ export async function generateMetadata({
 export default async function PublicNotePage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const session = await auth();
 
   // Get the note
   const note = await db.note.findUnique({
     where: {
-      id: params.id,
+      id: (await params).id,
     },
     include: {
       user: {
@@ -100,10 +100,10 @@ export default async function PublicNotePage({
 
         {isOwner && (
           <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link href={`/dashboard/notes/${params.id}/edit`}>
+            <Link href={`/dashboard/notes/${(await params).id}/edit`}>
               <Button variant="outline">Edit Note</Button>
             </Link>
-            <Link href={`/dashboard/notes/${params.id}`}>
+            <Link href={`/dashboard/notes/${(await params).id}`}>
               <Button>Manage Note</Button>
             </Link>
           </div>
