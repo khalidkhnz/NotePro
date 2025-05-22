@@ -1,19 +1,17 @@
 "use client";
 
-import { notFound, redirect, useParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import type { Metadata } from "next";
 import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Switch } from "~/components/ui/switch";
-import { auth } from "~/server/auth";
-import { db } from "~/server/db";
 import {
   Select,
   SelectContent,
@@ -22,21 +20,33 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
-// Enhanced fetch function for debugging
-const debugFetch = async (url: string, options?: RequestInit) => {
-  console.log(`🔍 Fetching: ${url}`, options);
-  try {
-    const response = await fetch(url, options);
-    console.log(`✅ Response for ${url}:`, {
-      status: response.status,
-      ok: response.ok,
-      statusText: response.statusText,
-    });
-    return response;
-  } catch (error) {
-    console.error(`❌ Error fetching ${url}:`, error);
-    throw error;
-  }
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const fadeInVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 24 },
+  },
+};
+
+const headerVariants = {
+  hidden: { opacity: 0, y: -20 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 30 },
+  },
 };
 
 function SubmitButton() {
@@ -158,6 +168,7 @@ function EditNoteForm({
 
 export default function EditNotePage() {
   const params = useParams();
+  const router = useRouter();
   const [note, setNote] = useState<any | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [hasError, setHasError] = useState(false);
@@ -167,16 +178,7 @@ export default function EditNotePage() {
 
   useEffect(() => {
     // Get the note ID from the route parameters
-    const noteId = params.id as string;
-
-    console.log("🔍 Route params:", params);
-    console.log("🔍 Extracted noteId:", noteId);
-    console.log("🔍 Full window.location:", {
-      href: window.location.href,
-      origin: window.location.origin,
-      pathname: window.location.pathname,
-      host: window.location.host,
-    });
+    const noteId = params?.id as string;
 
     if (!noteId) {
       setNotFound(true);
@@ -196,44 +198,37 @@ export default function EditNotePage() {
       try {
         setIsLoading(true);
 
-        // First check if user is authenticated
-        const sessionResponse = await fetch(
-          `${window.location.origin}/api/auth/session`,
-        );
-        const sessionData = await sessionResponse.json();
-
-        if (!sessionData.user) {
-          window.location.href = "/auth/signin";
-          return;
-        }
-
         // Fetch the note
-        const noteUrl = `${window.location.origin}/api/notes/${noteId}`;
-        console.log(`🔍 Fetching note from: ${noteUrl}`);
-        const noteResponse = await fetch(noteUrl);
+        const noteUrl = `/api/notes/${noteId}`;
 
-        if (!noteResponse.ok) {
-          const errorData = await noteResponse.json();
-          console.error("❌ Note fetch error:", errorData);
+        try {
+          const noteResponse = await fetch(noteUrl);
+
+          if (!noteResponse.ok) {
+            const errorData = await noteResponse.json();
+            setNotFound(true);
+            setErrorDetails(errorData.error || "Failed to load note");
+            return;
+          }
+
+          const noteData = await noteResponse.json();
+          setNote(noteData);
+
+          // Only fetch categories if we successfully got the note
+          try {
+            const categoriesResponse = await fetch("/api/categories");
+            const categoriesData = await categoriesResponse.json();
+            setCategories(categoriesData);
+          } catch (categoryError) {
+            setCategories([]);
+          }
+        } catch (noteError) {
           setNotFound(true);
-          setErrorDetails(errorData.error || "Failed to load note");
-          return;
+          setErrorDetails("Failed to load note data");
         }
-
-        const noteData = await noteResponse.json();
-        console.log("✅ Note data received:", noteData);
-        setNote(noteData);
-
-        // Fetch categories
-        const categoriesResponse = await fetch(
-          `${window.location.origin}/api/categories`,
-        );
-        const categoriesData = await categoriesResponse.json();
-        setCategories(categoriesData);
       } catch (error) {
-        console.error("Error fetching data:", error);
         setHasError(true);
-        setErrorDetails("Network error while loading note data");
+        setErrorDetails("Error loading data");
       } finally {
         setIsLoading(false);
       }
@@ -247,41 +242,25 @@ export default function EditNotePage() {
 
     const noteId = params.id as string;
 
-    const title = formData.get("title") as string;
-    const content = formData.get("content") as string;
-    const isPublicValue = formData.get("isPublic");
-    const isPinnedValue = formData.get("isPinned");
-    const categoryId = formData.get("categoryId") as string;
-
-    const isPublic = isPublicValue === "on";
-    const isPinned = isPinnedValue === "on";
-
-    const updateData = {
-      title,
-      content,
-      isPublic,
-      isPinned,
-      categoryId: categoryId === "none" ? null : categoryId || null,
-    };
-
-    console.log("🔍 Updating note data:", updateData);
-
     try {
-      // First check if still authenticated
-      const sessionResponse = await fetch(
-        `${window.location.origin}/api/auth/session`,
-      );
-      const sessionData = await sessionResponse.json();
+      // Get form values
+      const title = formData.get("title") as string;
+      const content = formData.get("content") as string;
+      const isPublic = formData.get("isPublic") === "on";
+      const isPinned = formData.get("isPinned") === "on";
+      const categoryId = formData.get("categoryId") as string;
 
-      if (!sessionData.user) {
-        window.location.href = "/auth/signin";
-        return;
-      }
+      // Prepare data
+      const updateData = {
+        title,
+        content,
+        isPublic,
+        isPinned,
+        categoryId: categoryId === "none" ? null : categoryId || null,
+      };
 
-      const updateUrl = `${window.location.origin}/api/notes/${noteId}`;
-      console.log(`🔍 Sending update to: ${updateUrl}`);
-
-      const response = await fetch(updateUrl, {
+      // Send update request
+      const response = await fetch(`/api/notes/${noteId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -291,19 +270,17 @@ export default function EditNotePage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("❌ Update error:", errorData);
         setHasError(true);
         setErrorDetails(errorData.error || "Failed to update note");
         return;
       }
 
-      const updatedNote = await response.json();
-      console.log("✅ Note updated successfully:", updatedNote);
-      window.location.href = `/dashboard/notes/${noteId}?updated=true`;
+      // Success - redirect
+      router.push(`/dashboard/notes/${noteId}?updated=true`);
     } catch (error) {
       console.error("Error updating note:", error);
       setHasError(true);
-      setErrorDetails("Network error while updating note");
+      setErrorDetails("Error updating note");
     }
   }
 
@@ -346,10 +323,11 @@ export default function EditNotePage() {
     );
   }
 
+  // Main edit form
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       <div className="mb-8">
-        <Link href={`/dashboard/notes/${params.id}`}>
+        <Link href={`/dashboard/notes/${params.id as string}`}>
           <Button variant="ghost" className="pl-0">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Note

@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 
-// Schema for creating a note
+// Schema for creating a new note
 const createNoteSchema = z.object({
   title: z.string().min(1, "Title is required"),
   content: z.string().min(1, "Content is required"),
@@ -13,7 +13,18 @@ const createNoteSchema = z.object({
   categoryId: z.string().nullable().optional(),
 });
 
-export async function POST(request: Request) {
+// Query params schema
+const getNotesQuerySchema = z.object({
+  page: z.coerce.number().optional().default(1),
+  perPage: z.coerce.number().optional().default(9),
+  q: z.string().optional().nullable(),
+  categoryId: z.string().optional().nullable(),
+  isPublic: z.enum(["true", "false"]).optional().nullable(),
+  isPinned: z.enum(["true", "false"]).optional().nullable(),
+});
+
+// GET notes with pagination, filtering and search
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
 
@@ -21,82 +32,96 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const validatedData = createNoteSchema.safeParse(body);
+    // Parse URL search params
+    const url = new URL(request.url);
 
-    if (!validatedData.success) {
+    // Validate and parse query parameters
+    const queryParams = getNotesQuerySchema.safeParse({
+      page: url.searchParams.get("page"),
+      perPage: url.searchParams.get("perPage"),
+      q: url.searchParams.get("q"),
+      categoryId: url.searchParams.get("categoryId"),
+      isPublic: url.searchParams.get("isPublic"),
+      isPinned: url.searchParams.get("isPinned"),
+    });
+
+    if (!queryParams.success) {
       return NextResponse.json(
-        { error: "Invalid data", details: validatedData.error },
+        { error: "Invalid query parameters", details: queryParams.error },
         { status: 400 },
       );
     }
 
-    const { title, content, isPublic, isPinned, categoryId } =
-      validatedData.data;
+    const { page, perPage, q, categoryId, isPublic, isPinned } =
+      queryParams.data;
 
-    // Create note
-    const note = await db.note.create({
-      data: {
-        title,
-        content,
-        isPublic,
-        isPinned,
-        userId: session.user.id,
-        categoryId,
-      },
-    });
+    // Calculate pagination
+    const skip = (page - 1) * perPage;
 
-    return NextResponse.json(note, { status: 201 });
-  } catch (error) {
-    console.error("Error creating note:", error);
-    return NextResponse.json(
-      { error: "Failed to create note" },
-      { status: 500 },
-    );
-  }
-}
-
-export async function GET(request: Request) {
-  try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const url = new URL(request.url);
-    const searchParams = url.searchParams;
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
-    const query = searchParams.get("q") || "";
-
-    const skip = (page - 1) * limit;
-
-    // Build query conditions
-    const whereConditions: any = {
+    // Build where clause for filtering
+    const whereClause: any = {
       userId: session.user.id,
     };
 
-    if (query) {
-      whereConditions.OR = [
-        { title: { contains: query } },
-        { content: { contains: query } },
+    // Add search query if provided
+    if (q) {
+      whereClause.OR = [
+        { title: { contains: q } },
+        { content: { contains: q } },
       ];
     }
 
-    // Get notes count
-    const totalNotes = await db.note.count({
-      where: whereConditions,
+    // Add category filter if provided
+    if (categoryId) {
+      whereClause.categoryId = categoryId;
+    }
+
+    // Add public filter if provided
+    if (isPublic) {
+      whereClause.isPublic = isPublic === "true";
+    }
+
+    // Add pinned filter if provided
+    if (isPinned) {
+      whereClause.isPinned = isPinned === "true";
+    }
+
+    // Get total count for pagination
+    const total = await db.note.count({
+      where: whereClause,
     });
 
-    // Get notes with pagination
+    // Get pinned notes
+    const pinnedNotes = await db.note.findMany({
+      where: {
+        ...whereClause,
+        isPinned: true,
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+      },
+    });
+
+    // Get regular notes with pagination
     const notes = await db.note.findMany({
-      where: whereConditions,
+      where: {
+        ...whereClause,
+        isPinned: false,
+      },
       orderBy: {
         updatedAt: "desc",
       },
       skip,
-      take: limit,
+      take: perPage,
       include: {
         category: {
           select: {
@@ -110,17 +135,63 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       notes,
-      pagination: {
-        total: totalNotes,
-        page,
-        limit,
-        pages: Math.ceil(totalNotes / limit),
-      },
+      pinnedNotes,
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil((total - pinnedNotes.length) / perPage),
     });
   } catch (error) {
     console.error("Error fetching notes:", error);
     return NextResponse.json(
       { error: "Failed to fetch notes" },
+      { status: 500 },
+    );
+  }
+}
+
+// POST to create a new note
+export async function POST(request: Request) {
+  try {
+    const session = await auth();
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Parse and validate request body
+    const body = await request.json();
+    const validatedData = createNoteSchema.safeParse(body);
+
+    if (!validatedData.success) {
+      return NextResponse.json(
+        { error: "Invalid data", details: validatedData.error },
+        { status: 400 },
+      );
+    }
+
+    // Create the note
+    const note = await db.note.create({
+      data: {
+        ...validatedData.data,
+        userId: session.user.id,
+      },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(note, { status: 201 });
+  } catch (error) {
+    console.error("Error creating note:", error);
+    return NextResponse.json(
+      { error: "Failed to create note" },
       { status: 500 },
     );
   }

@@ -9,18 +9,20 @@ import { Button } from "~/components/ui/button";
 interface SearchInputProps {
   placeholder?: string;
   className?: string;
+  defaultValue?: string;
 }
 
 export function SearchInput({
   placeholder = "Search...",
   className,
+  defaultValue,
 }: SearchInputProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  // Get the current search query from URL
-  const currentQuery = searchParams.get("q") || "";
+  // Get the current search query from URL or defaultValue
+  const currentQuery = defaultValue ?? searchParams.get("q") ?? "";
   const [query, setQuery] = useState(currentQuery);
 
   // Handle search submission

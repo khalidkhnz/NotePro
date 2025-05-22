@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build",
+    "build": "next build --no-lint",
     "build:skip-lint": "next build --no-lint",
     "check": "next lint && tsc --noEmit",
     "db:generate": "prisma migrate dev",
