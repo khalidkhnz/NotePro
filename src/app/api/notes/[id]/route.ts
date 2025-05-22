@@ -19,13 +19,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    console.log("📝 GET Note API called with params:", params);
     const session = await auth();
+    console.log("📝 Session:", session?.user?.id);
+
+    // Await params before using
+    const resolvedParams = await params;
+    console.log("📝 Resolved params:", resolvedParams);
 
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const noteId = (await params).id;
+    const noteId = resolvedParams.id;
+    console.log("📝 Looking for note with ID:", noteId);
 
     // Get the note with category
     const note = await db.note.findUnique({
@@ -43,6 +50,8 @@ export async function GET(
         },
       },
     });
+
+    console.log("📝 Note found:", note ? "Yes" : "No");
 
     if (!note) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 });
@@ -64,13 +73,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    console.log("📝 PATCH Note API called with params:", params);
     const session = await auth();
+    console.log("📝 Session:", session?.user?.id);
 
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const noteId = (await params).id;
+    // Await params before using
+    const resolvedParams = await params;
+    console.log("📝 Resolved params:", resolvedParams);
+    const noteId = resolvedParams.id;
+    console.log("📝 Updating note with ID:", noteId);
 
     // Check if note exists and belongs to the user
     const existingNote = await db.note.findUnique({
@@ -80,15 +95,19 @@ export async function PATCH(
       },
     });
 
+    console.log("📝 Note found:", existingNote ? "Yes" : "No");
+
     if (!existingNote) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 });
     }
 
     // Parse and validate request body
     const body = await request.json();
+    console.log("📝 Request body:", body);
     const validatedData = updateNoteSchema.safeParse(body);
 
     if (!validatedData.success) {
+      console.log("📝 Validation error:", validatedData.error);
       return NextResponse.json(
         { error: "Invalid data", details: validatedData.error },
         { status: 400 },
@@ -112,6 +131,7 @@ export async function PATCH(
       },
     });
 
+    console.log("📝 Note updated successfully");
     return NextResponse.json(updatedNote);
   } catch (error) {
     console.error("Error updating note:", error);
@@ -134,7 +154,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const noteId = (await params).id;
+    // Await params before using
+    const resolvedParams = await params;
+    const noteId = resolvedParams.id;
 
     // Check if note exists and belongs to the user
     const existingNote = await db.note.findUnique({
@@ -170,6 +192,9 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // Log the PUT request
+  console.log("📝 PUT Note API called with params:", params);
+
   // Reuse the same logic as PATCH for the PUT method
   return PATCH(request, { params });
 }

@@ -10,8 +10,9 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
+  const resolvedParams = await params;
   const note = await db.note.findUnique({
-    where: { id: (await params).id },
+    where: { id: resolvedParams.id },
   });
 
   if (!note) {
@@ -39,10 +40,13 @@ export default async function NotePage({
     return notFound();
   }
 
+  // Await params before using
+  const resolvedParams = await params;
+
   // Get the note with category
   const note = await db.note.findUnique({
     where: {
-      id: (await params).id,
+      id: resolvedParams.id,
     },
     include: {
       category: true,

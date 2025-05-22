@@ -143,6 +143,11 @@ const HeroAnimation = () => {
 export default function Home() {
   const [publicNotes, setPublicNotes] = useState<any[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [stats, setStats] = useState({
+    users: 0,
+    notes: 0,
+    publicNotes: 0,
+  });
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
 
@@ -159,6 +164,15 @@ export default function Home() {
         const notesRes = await fetch("/api/notes?public=true");
         const notesData = await notesRes.json();
         setPublicNotes(notesData?.notes || []);
+
+        // Get statistics
+        const statsRes = await fetch("/api/stats");
+        const statsData = await statsRes.json();
+        setStats({
+          users: statsData.users || 0,
+          notes: statsData.notes || 0,
+          publicNotes: statsData.publicNotes || 0,
+        });
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -166,6 +180,11 @@ export default function Home() {
 
     fetchData();
   }, []);
+
+  // Format numbers with commas
+  const formatNumber = (num: number) => {
+    return num.toLocaleString();
+  };
 
   return (
     <main className="flex flex-col">
@@ -350,9 +369,9 @@ export default function Home() {
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 md:grid-cols-3">
             {[
-              { count: "10,000+", label: "Active Users" },
-              { count: "1M+", label: "Notes Created" },
-              { count: "100K+", label: "Public Notes" },
+              { count: formatNumber(stats.users), label: "Active Users" },
+              { count: formatNumber(stats.notes), label: "Notes Created" },
+              { count: formatNumber(stats.publicNotes), label: "Public Notes" },
             ].map((stat, index) => (
               <motion.div
                 key={index}

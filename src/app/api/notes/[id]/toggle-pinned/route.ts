@@ -13,7 +13,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const noteId = (await params).id;
+    // Await params before using
+    const resolvedParams = await params;
+    const noteId = resolvedParams.id;
 
     // Check if note exists and belongs to the user
     const note = await db.note.findUnique({

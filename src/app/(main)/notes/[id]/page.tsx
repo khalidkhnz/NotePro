@@ -12,8 +12,9 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
+  const resolvedParams = await params;
   const note = await db.note.findUnique({
-    where: { id: (await params).id },
+    where: { id: resolvedParams.id },
     include: {
       user: {
         select: {
@@ -42,11 +43,12 @@ export default async function PublicNotePage({
   params: Promise<{ id: string }>;
 }) {
   const session = await auth();
+  const resolvedParams = await params;
 
   // Get the note
   const note = await db.note.findUnique({
     where: {
-      id: (await params).id,
+      id: resolvedParams.id,
     },
     include: {
       user: {
@@ -75,40 +77,38 @@ export default async function PublicNotePage({
         </Link>
       </div>
 
-      <div className="mx-auto max-w-3xl">
-        <article className="prose prose-gray dark:prose-invert max-w-none">
-          <h1 className="mb-4 text-3xl font-bold">{note.title}</h1>
+      <article className="prose prose-gray dark:prose-invert max-w-none">
+        <h1 className="mb-4 text-3xl font-bold">{note.title}</h1>
 
-          <div className="text-muted-foreground mb-8 flex flex-wrap items-center gap-2 text-sm sm:gap-4">
-            <div>By {note.user.name || "Anonymous"}</div>
-            <div className="hidden sm:block">•</div>
-            <time dateTime={note.updatedAt.toISOString()}>
-              {new Date(note.updatedAt).toLocaleDateString()}
-            </time>
-            {isOwner && (
-              <>
-                <div className="hidden sm:block">•</div>
-                <div className="text-primary">You are the author</div>
-              </>
-            )}
-          </div>
+        <div className="text-muted-foreground mb-8 flex flex-wrap items-center gap-2 text-sm sm:gap-4">
+          <div>By {note.user.name || "Anonymous"}</div>
+          <div className="hidden sm:block">•</div>
+          <time dateTime={note.updatedAt.toISOString()}>
+            {new Date(note.updatedAt).toLocaleDateString()}
+          </time>
+          {isOwner && (
+            <>
+              <div className="hidden sm:block">•</div>
+              <div className="text-primary">You are the author</div>
+            </>
+          )}
+        </div>
 
-          <div className="leading-relaxed whitespace-pre-wrap">
-            {note.content}
-          </div>
-        </article>
+        <div className="leading-relaxed whitespace-pre-wrap">
+          {note.content}
+        </div>
+      </article>
 
-        {isOwner && (
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link href={`/dashboard/notes/${(await params).id}/edit`}>
-              <Button variant="outline">Edit Note</Button>
-            </Link>
-            <Link href={`/dashboard/notes/${(await params).id}`}>
-              <Button>Manage Note</Button>
-            </Link>
-          </div>
-        )}
-      </div>
+      {isOwner && (
+        <div className="mt-10 flex flex-wrap justify-center gap-4">
+          <Link href={`/dashboard/notes/${resolvedParams.id}/edit`}>
+            <Button variant="outline">Edit Note</Button>
+          </Link>
+          <Link href={`/dashboard/notes/${resolvedParams.id}`}>
+            <Button>Manage Note</Button>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

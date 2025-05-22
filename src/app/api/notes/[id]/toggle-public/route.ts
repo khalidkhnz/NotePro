@@ -13,7 +13,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const noteId = (await params).id;
+    const resolvedParams = await params;
+    const noteId = resolvedParams.id;
 
     const note = await db.note.findUnique({
       where: {
