@@ -18,7 +18,7 @@
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "preview": "next build && next start",
-    "start": "next start",
+    "start": "prisma migrate dev && prisma migrate deploy && prisma db push && next start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
