@@ -6,6 +6,8 @@ import { ArrowLeft, FolderIcon, Plus, Pencil } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+import { SearchInput } from "~/components/search-input";
+import { Pagination } from "~/components/pagination";
 
 export async function generateMetadata({
   params,
@@ -30,10 +32,20 @@ export async function generateMetadata({
   };
 }
 
+// Constants for pagination
+const ITEMS_PER_PAGE = 12; // Notes per page
+
+interface SearchParams {
+  page?: string;
+  q?: string;
+}
+
 export default async function CategoryNotesPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: SearchParams;
 }) {
   const session = await auth();
 
@@ -41,6 +53,13 @@ export default async function CategoryNotesPage({
   if (!session?.user) {
     redirect("/auth/signin");
   }
+
+  // Parse search params
+  const currentPage = Number(searchParams.page) || 1;
+  const searchQuery = searchParams.q || "";
+
+  // Pagination offset
+  const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
   // Get the category
   const category = await db.category.findUnique({
@@ -54,15 +73,33 @@ export default async function CategoryNotesPage({
     notFound();
   }
 
-  // Get notes in this category
+  // Base query for notes
+  const whereClause = {
+    userId: session.user.id,
+    categoryId: params.id,
+    ...(searchQuery
+      ? {
+          OR: [
+            { title: { contains: searchQuery } },
+            { content: { contains: searchQuery } },
+          ],
+        }
+      : {}),
+  };
+
+  // Count total notes for pagination
+  const totalNotes = await db.note.count({
+    where: whereClause,
+  });
+
+  // Get notes in this category with pagination
   const notes = await db.note.findMany({
-    where: {
-      userId: session.user.id,
-      categoryId: params.id,
-    },
+    where: whereClause,
     orderBy: {
       updatedAt: "desc",
     },
+    skip,
+    take: ITEMS_PER_PAGE,
   });
 
   return (
@@ -114,6 +151,19 @@ export default async function CategoryNotesPage({
         </div>
       </div>
 
+      {/* Search */}
+      <div className="mb-6">
+        <SearchInput
+          placeholder={`Search in ${category.name}...`}
+          className="w-full sm:max-w-md"
+        />
+        {searchQuery && (
+          <p className="text-muted-foreground mt-2 text-sm">
+            Showing results for "{searchQuery}" in {category.name}
+          </p>
+        )}
+      </div>
+
       {notes.length === 0 ? (
         <div className="bg-muted/10 flex flex-col items-center justify-center rounded-lg border py-12 text-center">
           <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
@@ -121,10 +171,14 @@ export default async function CategoryNotesPage({
               <Plus className="text-muted-foreground h-10 w-10" />
             </div>
             <h2 className="mt-6 text-xl font-semibold">
-              No notes in this category
+              {searchQuery
+                ? `No notes found matching "${searchQuery}"`
+                : `No notes in this category`}
             </h2>
             <p className="text-muted-foreground mt-2 mb-6 text-center">
-              Create a new note in the {category.name} category.
+              {searchQuery
+                ? "Try a different search term or create a new note."
+                : `Create a new note in the ${category.name} category.`}
             </p>
             <Link
               href={{
@@ -140,32 +194,56 @@ export default async function CategoryNotesPage({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {notes.map((note) => (
-            <Link
-              key={note.id}
-              href={`/dashboard/notes/${note.id}`}
-              className="hover:bg-muted/50 flex h-full flex-col space-y-2 rounded-lg border p-5 transition-colors"
-            >
-              <div className="flex items-start justify-between">
-                <h3 className="line-clamp-1 text-xl font-bold">{note.title}</h3>
-                {note.isPublic && (
-                  <span className="text-foreground focus:ring-ring inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none">
-                    Public
-                  </span>
-                )}
-              </div>
-              <p className="text-muted-foreground line-clamp-3 flex-grow">
-                {note.content}
+        <>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Notes</h2>
+            {totalNotes > 0 && (
+              <p className="text-muted-foreground text-sm">
+                Showing {skip + 1}-{Math.min(skip + notes.length, totalNotes)}{" "}
+                of {totalNotes} notes
               </p>
-              <div className="text-muted-foreground flex items-center justify-between pt-2 text-xs">
-                <time dateTime={note.updatedAt.toISOString()}>
-                  {new Date(note.updatedAt).toLocaleDateString()}
-                </time>
-              </div>
-            </Link>
-          ))}
-        </div>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {notes.map((note) => (
+              <Link
+                key={note.id}
+                href={`/dashboard/notes/${note.id}`}
+                className="hover:bg-muted/50 flex h-full flex-col space-y-2 rounded-lg border p-5 transition-colors"
+              >
+                <div className="flex items-start justify-between">
+                  <h3 className="line-clamp-1 text-xl font-bold">
+                    {note.title}
+                  </h3>
+                  {note.isPublic && (
+                    <span className="text-foreground focus:ring-ring inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none">
+                      Public
+                    </span>
+                  )}
+                </div>
+                <p className="text-muted-foreground line-clamp-3 flex-grow">
+                  {note.content}
+                </p>
+                <div className="text-muted-foreground flex items-center justify-between pt-2 text-xs">
+                  <time dateTime={note.updatedAt.toISOString()}>
+                    {new Date(note.updatedAt).toLocaleDateString()}
+                  </time>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalNotes > ITEMS_PER_PAGE && (
+            <div className="mt-8">
+              <Pagination
+                totalItems={totalNotes}
+                pageSize={ITEMS_PER_PAGE}
+                currentPage={currentPage}
+              />
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,25 +1,46 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { FolderIcon, FilterIcon, Plus, PinIcon } from "lucide-react";
+import { FolderIcon, FilterIcon, Plus, PinIcon, Search } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 import { Badge } from "~/components/ui/badge";
+import { SearchInput } from "~/components/search-input";
+import { Pagination } from "~/components/pagination";
 
 export const metadata: Metadata = {
   title: "Dashboard - Manage Your Notes",
   description: "View and manage your personal notes",
 };
 
-export default async function DashboardPage() {
+// Constants for pagination
+const ITEMS_PER_PAGE = 9; // Notes per page
+
+interface SearchParams {
+  page?: string;
+  q?: string;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const session = await auth();
 
   // Redirect to sign in if not logged in
   if (!session?.user) {
     redirect("/auth/signin");
   }
+
+  // Parse search params
+  const currentPage = Number(searchParams.page) || 1;
+  const searchQuery = searchParams.q || "";
+
+  // Pagination offset
+  const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
   // Get user's categories
   const categories = await db.category.findMany({
@@ -32,10 +53,28 @@ export default async function DashboardPage() {
     take: 4, // Only get a few for the dashboard
   });
 
+  // Base query for notes
+  const whereClause = {
+    userId: session.user.id,
+    ...(searchQuery
+      ? {
+          OR: [
+            { title: { contains: searchQuery } },
+            { content: { contains: searchQuery } },
+          ],
+        }
+      : {}),
+  };
+
+  // Get total count for pagination
+  const totalNotes = await db.note.count({
+    where: whereClause,
+  });
+
   // Get user's pinned notes
   const pinnedNotes = await db.note.findMany({
     where: {
-      userId: session.user.id,
+      ...whereClause,
       isPinned: true,
     },
     orderBy: {
@@ -46,20 +85,25 @@ export default async function DashboardPage() {
     },
   });
 
-  // Get user's recent notes
+  // Get user's recent notes with pagination
   const recentNotes = await db.note.findMany({
     where: {
-      userId: session.user.id,
+      ...whereClause,
       isPinned: false,
     },
     orderBy: {
       updatedAt: "desc",
     },
-    take: 6,
+    skip,
+    take: ITEMS_PER_PAGE,
     include: {
       category: true,
     },
   });
+
+  // Calculate total pages for pagination
+  const unpinnedCount = totalNotes - pinnedNotes.length;
+  const totalPages = Math.ceil(unpinnedCount / ITEMS_PER_PAGE);
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -90,6 +134,19 @@ export default async function DashboardPage() {
             </Button>
           </Link>
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="mb-6">
+        <SearchInput
+          placeholder="Search notes..."
+          className="w-full sm:max-w-md"
+        />
+        {searchQuery && (
+          <p className="text-muted-foreground mt-2 text-sm">
+            Showing results for "{searchQuery}"
+          </p>
+        )}
       </div>
 
       {/* Quick access to categories */}
@@ -183,8 +240,18 @@ export default async function DashboardPage() {
 
       {/* Recent notes section */}
       <div>
-        <h2 className="mb-4 text-xl font-semibold">Recent Notes</h2>
-        {recentNotes.length === 0 && pinnedNotes.length === 0 ? (
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Recent Notes</h2>
+          {recentNotes.length > 0 && unpinnedCount > 0 && (
+            <p className="text-muted-foreground text-sm">
+              Showing {skip + 1}-
+              {Math.min(skip + recentNotes.length, unpinnedCount)} of{" "}
+              {unpinnedCount} notes
+            </p>
+          )}
+        </div>
+
+        {totalNotes === 0 ? (
           <div className="bg-muted/10 flex flex-col items-center justify-center rounded-lg border py-12 text-center">
             <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
               <div className="bg-muted flex h-20 w-20 items-center justify-center rounded-full">
@@ -192,8 +259,9 @@ export default async function DashboardPage() {
               </div>
               <h2 className="mt-6 text-xl font-semibold">No notes yet</h2>
               <p className="text-muted-foreground mt-2 mb-6 text-center">
-                You haven't created any notes yet. Start creating your first
-                note.
+                {searchQuery
+                  ? `No notes found matching "${searchQuery}"`
+                  : "You haven't created any notes yet. Start creating your first note."}
               </p>
               <Link href="/dashboard/notes/new">
                 <Button className="w-full gap-1 sm:w-auto">
@@ -203,9 +271,11 @@ export default async function DashboardPage() {
               </Link>
             </div>
           </div>
-        ) : recentNotes.length === 0 ? (
+        ) : recentNotes.length === 0 && pinnedNotes.length > 0 ? (
           <p className="text-muted-foreground py-4 text-center">
-            No recent notes. All your notes are pinned.
+            {searchQuery
+              ? `No unpinned notes found matching "${searchQuery}"`
+              : "No recent notes. All your notes are pinned."}
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -246,6 +316,17 @@ export default async function DashboardPage() {
                 </div>
               </Link>
             ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {recentNotes.length > 0 && unpinnedCount > ITEMS_PER_PAGE && (
+          <div className="mt-8">
+            <Pagination
+              totalItems={unpinnedCount}
+              pageSize={ITEMS_PER_PAGE}
+              currentPage={currentPage}
+            />
           </div>
         )}
       </div>
