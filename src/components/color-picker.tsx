@@ -54,8 +54,8 @@ export function ColorPicker({ color, onChange }: ColorPickerProps) {
             key={colorOption}
             type="button"
             className={cn(
-              "h-8 w-8 rounded-full border border-gray-200 transition-all hover:scale-110 focus:ring-2 focus:ring-offset-2 focus:outline-none",
-              color === colorOption && "ring-2 ring-offset-2",
+              "flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 transition-all hover:scale-110 focus:ring-2 focus:ring-offset-2 focus:outline-none",
+              color === colorOption && "z-20 ring-2 ring-offset-2",
             )}
             style={{ backgroundColor: colorOption }}
             onClick={() => handleColorChange(colorOption)}
@@ -94,13 +94,17 @@ export function ColorPicker({ color, onChange }: ColorPickerProps) {
 
       {isCustomColorVisible && (
         <div className="flex items-center gap-2">
-          <input
-            type="color"
-            value={customColor}
-            onChange={handleCustomColorChange}
-            className="h-8 w-8 cursor-pointer appearance-none rounded-md border border-gray-200 bg-transparent p-0"
+          <div
+            className="relative h-8 w-8 rounded-full"
             style={{ backgroundColor: customColor }}
-          />
+          >
+            <input
+              type="color"
+              value={customColor}
+              onChange={handleCustomColorChange}
+              className="absolute top-0 left-0 h-8 w-8 cursor-pointer appearance-none rounded-md border border-gray-200 bg-transparent p-0 opacity-0"
+            />
+          </div>
           <span className="text-sm text-gray-600">{customColor}</span>
         </div>
       )}
