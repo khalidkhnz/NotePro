@@ -164,3 +164,12 @@ export async function DELETE(
     );
   }
 }
+
+// Add PUT method to support client component updates
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  // Reuse the same logic as PATCH for the PUT method
+  return PATCH(request, { params });
+}

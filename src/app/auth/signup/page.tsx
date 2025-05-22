@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { z } from "zod";
-import bcrypt from "bcryptjs";
-import { BookText } from "lucide-react";
+import { BookText, AlertCircle, Loader2 } from "lucide-react";
+import { useFormStatus } from "react-dom";
+import { useEffect, useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -16,13 +17,6 @@ import {
 } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { auth, signIn } from "~/server/auth";
-import { db } from "~/server/db";
-
-export const metadata: Metadata = {
-  title: "Sign Up",
-  description: "Create a new account",
-};
 
 const signUpSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -30,72 +24,166 @@ const signUpSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-export default async function SignUpPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const session = await auth();
-  const params = await searchParams;
+function SignUpButton() {
+  const { pending } = useFormStatus();
 
-  // Redirect to dashboard if already signed in
-  if (session?.user) {
-    redirect("/dashboard");
-  }
+  return (
+    <Button type="submit" className="mt-6 w-full" disabled={pending}>
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Creating account...
+        </>
+      ) : (
+        "Sign Up"
+      )}
+    </Button>
+  );
+}
 
-  async function signUp(formData: FormData): Promise<void> {
-    "use server";
+function DiscordButton() {
+  const { pending } = useFormStatus();
 
+  return (
+    <Button
+      className="w-full"
+      variant="outline"
+      type="submit"
+      disabled={pending}
+    >
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Connecting...
+        </>
+      ) : (
+        "Discord"
+      )}
+    </Button>
+  );
+}
+
+export default function SignUpPage() {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if user is already signed in
+    async function checkSession() {
+      try {
+        const response = await fetch("/api/auth/session");
+        const data = await response.json();
+
+        if (data.user) {
+          window.location.href = "/dashboard";
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
+      }
+    }
+
+    // Get error from URL if present
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+
+    // Define error messages
+    const errorMessages: Record<string, string> = {
+      ValidationError: "Please check your information and try again.",
+      ServerError: "Something went wrong. Please try again later.",
+      EmailAlreadyExists:
+        "An account with this email already exists. Please sign in instead.",
+      PasswordTooShort: "Password must be at least 6 characters.",
+      InvalidEmail: "Please enter a valid email address.",
+      Default: "Something went wrong. Please try again later.",
+    };
+
+    // Set error message if present
+    if (error) {
+      setErrorMessage(
+        (errorMessages[error as keyof typeof errorMessages] ||
+          errorMessages.Default) as string,
+      );
+    }
+
+    checkSession();
+  }, []);
+
+  async function handleSignUp(formData: FormData) {
     const name = formData.get("name") as string;
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
     try {
-      // Validate input
-      signUpSchema.parse({ name, email, password });
-
-      // Check if user already exists
-      const existingUser = await db.user.findUnique({
-        where: { email },
-      });
-
-      if (existingUser) {
-        return redirect("/auth/signin?error=EmailAlreadyExists");
+      // Client-side validation
+      try {
+        signUpSchema.parse({ name, email, password });
+      } catch (validationError) {
+        if (validationError instanceof z.ZodError) {
+          const firstError = validationError.errors[0];
+          if (firstError?.message.includes("email")) {
+            setErrorMessage("Please enter a valid email address.");
+            return;
+          } else if (firstError?.message.includes("password")) {
+            setErrorMessage("Password must be at least 6 characters.");
+            return;
+          }
+        }
+        setErrorMessage("Please check your information and try again.");
+        return;
       }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      // Create user directly
-      await db.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
+      // Send signup request
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({ name, email, password }),
       });
 
-      // Sign in the user after successful registration
-      await signIn("credentials", {
-        email,
-        password,
-        redirect: true,
-        redirectTo: "/dashboard",
-      });
-    } catch (error) {
-      if (
-        error instanceof z.ZodError &&
-        error.errors &&
-        error.errors.length > 0
-      ) {
-        console.error("Validation error:", error.errors);
-        console.error(error.errors[0]?.message || "Validation error");
-        return redirect("/auth/signup?error=ValidationError");
+      if (response.ok) {
+        // If successful, sign in and redirect
+        const signInResponse = await fetch("/api/auth/signin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (signInResponse.ok) {
+          window.location.href = "/dashboard";
+        } else {
+          window.location.href = "/auth/signin?error=EmailAlreadyExists";
+        }
       } else {
-        console.error("Registration error:", error);
-        console.error((error as Error).message || "Something went wrong");
-        return redirect("/auth/signup?error=ServerError");
+        const data = await response.json();
+        if (data.error === "EmailAlreadyExists") {
+          window.location.href = "/auth/signin?error=EmailAlreadyExists";
+        } else {
+          setErrorMessage(
+            data.error || "Something went wrong. Please try again later.",
+          );
+        }
       }
+    } catch (error) {
+      console.error("Error signing up:", error);
+      setErrorMessage("Something went wrong. Please try again later.");
+    }
+  }
+
+  async function handleDiscordSignIn() {
+    try {
+      const response = await fetch("/api/auth/discord");
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setErrorMessage("Could not sign in with Discord. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error signing in with Discord:", error);
+      setErrorMessage("Something went wrong. Please try again later.");
     }
   }
 
@@ -115,23 +203,15 @@ export default async function SignUpPage({
           <CardDescription className="text-center">
             Enter your information to create an account
           </CardDescription>
-          {params?.error === "ValidationError" && (
-            <div className="bg-destructive/15 rounded-md p-3">
-              <p className="text-destructive text-center text-sm">
-                Please check your information and try again.
-              </p>
-            </div>
-          )}
-          {params?.error === "ServerError" && (
-            <div className="bg-destructive/15 rounded-md p-3">
-              <p className="text-destructive text-center text-sm">
-                Something went wrong. Please try again later.
-              </p>
+          {errorMessage && (
+            <div className="bg-destructive/10 text-destructive flex items-center gap-2 rounded-md p-3">
+              <AlertCircle className="h-4 w-4" />
+              <p className="text-sm">{errorMessage}</p>
             </div>
           )}
         </CardHeader>
         <CardContent className="space-y-4 px-6">
-          <form action={signUp}>
+          <form action={handleSignUp}>
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -140,6 +220,7 @@ export default async function SignUpPage({
                 placeholder="John Doe"
                 required
                 className="w-full"
+                autoComplete="name"
               />
             </div>
             <div className="mt-4 space-y-2">
@@ -151,6 +232,7 @@ export default async function SignUpPage({
                 placeholder="name@example.com"
                 required
                 className="w-full"
+                autoComplete="email"
               />
             </div>
             <div className="mt-4 space-y-2">
@@ -161,11 +243,14 @@ export default async function SignUpPage({
                 type="password"
                 required
                 className="w-full"
+                autoComplete="new-password"
+                minLength={6}
               />
+              <p className="text-muted-foreground text-xs">
+                Password must be at least 6 characters long
+              </p>
             </div>
-            <Button type="submit" className="mt-6 w-full">
-              Sign Up
-            </Button>
+            <SignUpButton />
           </form>
 
           <div className="relative my-6">
@@ -179,18 +264,8 @@ export default async function SignUpPage({
             </div>
           </div>
 
-          <form
-            action={async () => {
-              "use server";
-              await signIn("discord", {
-                redirect: true,
-                redirectTo: "/dashboard",
-              });
-            }}
-          >
-            <Button className="w-full" variant="outline" type="submit">
-              Discord
-            </Button>
+          <form action={handleDiscordSignIn}>
+            <DiscordButton />
           </form>
         </CardContent>
         <CardFooter className="flex justify-center px-6 pb-6">

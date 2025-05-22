@@ -1,7 +1,11 @@
+"use client";
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookText } from "lucide-react";
+import { BookText, AlertCircle, Loader2 } from "lucide-react";
+import { useFormStatus } from "react-dom";
+import { useEffect, useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -14,24 +18,132 @@ import {
 } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { auth, signIn } from "~/server/auth";
 
-export const metadata: Metadata = {
-  title: "Sign In",
-  description: "Sign in to your account",
-};
+function SignInButton() {
+  const { pending } = useFormStatus();
 
-export default async function SignInPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const session = await auth();
-  const params = await searchParams;
+  return (
+    <Button type="submit" className="mt-6 w-full" disabled={pending}>
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Signing in...
+        </>
+      ) : (
+        "Sign In"
+      )}
+    </Button>
+  );
+}
 
-  // Redirect to dashboard if already signed in
-  if (session?.user) {
-    redirect("/dashboard");
+function DiscordButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button
+      className="w-full"
+      variant="outline"
+      type="submit"
+      disabled={pending}
+    >
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Connecting...
+        </>
+      ) : (
+        "Discord"
+      )}
+    </Button>
+  );
+}
+
+export default function SignInPage() {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if user is already signed in
+    async function checkSession() {
+      try {
+        const response = await fetch("/api/auth/session");
+        const data = await response.json();
+
+        if (data.user) {
+          window.location.href = "/dashboard";
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
+      }
+    }
+
+    // Get error from URL if present
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+
+    // Define error messages
+    const errorMessages: Record<string, string> = {
+      EmailAlreadyExists:
+        "An account with this email already exists. Please sign in instead.",
+      CredentialsSignin: "Invalid email or password. Please try again.",
+      OAuthAccountNotLinked:
+        "This email is already associated with another provider.",
+      OAuthSignin: "Could not sign in with the provider. Please try again.",
+      AccessDenied: "Access denied. You don't have permission to sign in.",
+      Default: "Something went wrong. Please try again later.",
+    };
+
+    // Set error message if present
+    if (error) {
+      setErrorMessage(
+        (errorMessages[error as keyof typeof errorMessages] ||
+          errorMessages.Default) as string,
+      );
+    }
+
+    checkSession();
+  }, []);
+
+  async function handleCredentialsSignIn(formData: FormData) {
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      const response = await fetch("/api/auth/signin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        window.location.href = "/dashboard";
+      } else {
+        const data = await response.json();
+        setErrorMessage(
+          data.error || "Invalid email or password. Please try again.",
+        );
+      }
+    } catch (error) {
+      console.error("Error signing in:", error);
+      setErrorMessage("Something went wrong. Please try again later.");
+    }
+  }
+
+  async function handleDiscordSignIn() {
+    try {
+      const response = await fetch("/api/auth/discord");
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setErrorMessage("Could not sign in with Discord. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error signing in with Discord:", error);
+      setErrorMessage("Something went wrong. Please try again later.");
+    }
   }
 
   return (
@@ -50,38 +162,15 @@ export default async function SignInPage({
           <CardDescription className="text-center">
             Enter your email and password to sign in to your account
           </CardDescription>
-          {params?.error === "EmailAlreadyExists" && (
-            <div className="bg-destructive/15 rounded-md p-3">
-              <p className="text-destructive text-center text-sm">
-                An account with this email already exists. Please sign in
-                instead.
-              </p>
-            </div>
-          )}
-          {params?.error === "CredentialsSignin" && (
-            <div className="bg-destructive/15 rounded-md p-3">
-              <p className="text-destructive text-center text-sm">
-                Invalid email or password. Please try again.
-              </p>
+          {errorMessage && (
+            <div className="bg-destructive/10 text-destructive flex items-center gap-2 rounded-md p-3">
+              <AlertCircle className="h-4 w-4" />
+              <p className="text-sm">{errorMessage}</p>
             </div>
           )}
         </CardHeader>
         <CardContent className="space-y-4 px-6">
-          <form
-            action={async (formData: FormData) => {
-              "use server";
-
-              const email = formData.get("email") as string;
-              const password = formData.get("password") as string;
-
-              await signIn("credentials", {
-                email,
-                password,
-                redirect: true,
-                redirectTo: "/dashboard",
-              });
-            }}
-          >
+          <form action={handleCredentialsSignIn}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -91,6 +180,7 @@ export default async function SignInPage({
                 placeholder="name@example.com"
                 required
                 className="w-full"
+                autoComplete="email"
               />
             </div>
             <div className="mt-4 space-y-2">
@@ -109,11 +199,10 @@ export default async function SignInPage({
                 type="password"
                 required
                 className="w-full"
+                autoComplete="current-password"
               />
             </div>
-            <Button type="submit" className="mt-6 w-full">
-              Sign In
-            </Button>
+            <SignInButton />
           </form>
 
           <div className="relative my-6">
@@ -127,18 +216,8 @@ export default async function SignInPage({
             </div>
           </div>
 
-          <form
-            action={async () => {
-              "use server";
-              await signIn("discord", {
-                redirect: true,
-                redirectTo: "/dashboard",
-              });
-            }}
-          >
-            <Button className="w-full" variant="outline" type="submit">
-              Discord
-            </Button>
+          <form action={handleDiscordSignIn}>
+            <DiscordButton />
           </form>
         </CardContent>
         <CardFooter className="flex justify-center px-6 pb-6">

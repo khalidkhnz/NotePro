@@ -1,7 +1,11 @@
+"use client";
+
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
+import { useFormStatus } from "react-dom";
+import { useEffect, useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -10,7 +14,6 @@ import { Textarea } from "~/components/ui/textarea";
 import { Switch } from "~/components/ui/switch";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
-import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -19,59 +22,158 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
-export const metadata: Metadata = {
-  title: "Create Note",
-  description: "Create a new note",
-};
+function SubmitButton() {
+  const { pending } = useFormStatus();
 
-type SearchParams = {
-  categoryId?: string;
-};
+  return (
+    <Button type="submit" className="w-full sm:w-auto" disabled={pending}>
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Creating...
+        </>
+      ) : (
+        "Create Note"
+      )}
+    </Button>
+  );
+}
 
-export default async function NewNotePage({
-  searchParams,
+function NoteForm({
+  createNote,
+  categories,
+  preselectedCategory,
 }: {
-  searchParams: Promise<SearchParams>;
+  createNote: (formData: FormData) => void;
+  categories: any[];
+  preselectedCategory: any | null;
 }) {
-  const session = await auth();
+  return (
+    <form action={createNote} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="title" className="text-base">
+          Title
+        </Label>
+        <Input
+          id="title"
+          name="title"
+          placeholder="Enter note title"
+          required
+          className="w-full"
+        />
+      </div>
 
-  // Redirect to sign in if not logged in
-  if (!session?.user) {
-    redirect("/auth/signin");
-  }
+      <div className="space-y-2">
+        <Label htmlFor="content" className="text-base">
+          Content
+        </Label>
+        <Textarea
+          id="content"
+          name="content"
+          placeholder="Write your note here..."
+          className="min-h-[300px] w-full resize-y"
+          required
+        />
+      </div>
 
-  // Get category ID from search params if it exists
-  const selectedCategoryId = (await searchParams).categoryId;
+      <div className="space-y-2">
+        <Label htmlFor="categoryId" className="text-base">
+          Category
+        </Label>
+        <Select
+          name="categoryId"
+          defaultValue={preselectedCategory ? preselectedCategory.id : "none"}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            {categories.map((category) => (
+              <SelectItem key={category.id} value={category.id}>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-3 w-3 rounded-full"
+                    style={{
+                      backgroundColor: category.color || "#94a3b8",
+                    }}
+                  />
+                  {category.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {preselectedCategory && (
+          <p className="text-muted-foreground text-xs">
+            Pre-selected category: {preselectedCategory.name}
+          </p>
+        )}
+      </div>
 
-  // Verify if the category exists and belongs to the user
-  let preselectedCategory = null;
-  if (selectedCategoryId) {
-    preselectedCategory = await db.category.findUnique({
-      where: {
-        id: selectedCategoryId,
-        userId: session.user.id,
-      },
-    });
-  }
+      <div className="space-y-4 sm:flex sm:items-center sm:justify-start sm:space-y-0 sm:space-x-6">
+        <div className="flex items-center space-x-2">
+          <Switch id="isPublic" name="isPublic" />
+          <Label htmlFor="isPublic" className="font-medium">
+            Make this note public
+          </Label>
+        </div>
 
-  // Get user's categories
-  const categories = await db.category.findMany({
-    where: {
-      userId: session.user.id,
-    },
-    orderBy: {
-      name: "asc",
-    },
-  });
+        <div className="flex items-center space-x-2">
+          <Switch id="isPinned" name="isPinned" />
+          <Label htmlFor="isPinned" className="font-medium">
+            Pin this note
+          </Label>
+        </div>
+      </div>
 
-  async function createNote(formData: FormData) {
-    "use server";
+      <div className="mt-8 flex justify-end">
+        <SubmitButton />
+      </div>
+    </form>
+  );
+}
 
-    if (!session?.user?.id) {
-      redirect("/auth/signin");
+export default function NewNotePage() {
+  const [categories, setCategories] = useState<any[]>([]);
+  const [preselectedCategory, setPreselectedCategory] = useState<any | null>(
+    null,
+  );
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    // Check for URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const categoryId = params.get("categoryId");
+    const error = params.get("error");
+
+    setHasError(error === "true");
+
+    // Fetch categories and preselected category if needed
+    async function fetchData() {
+      try {
+        // Fetch all categories
+        const categoriesResponse = await fetch("/api/categories");
+        const categoriesData = await categoriesResponse.json();
+        setCategories(categoriesData);
+
+        // Fetch preselected category if categoryId exists
+        if (categoryId) {
+          const categoryResponse = await fetch(`/api/categories/${categoryId}`);
+          if (categoryResponse.ok) {
+            const categoryData = await categoryResponse.json();
+            setPreselectedCategory(categoryData);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
     }
 
-    // Get form data
+    fetchData();
+  }, []);
+
+  async function createNote(formData: FormData) {
     const title = formData.get("title") as string;
     const content = formData.get("content") as string;
     const isPublicValue = formData.get("isPublic");
@@ -82,28 +184,34 @@ export default async function NewNotePage({
     const isPinned = isPinnedValue === "on";
 
     try {
-      // Create note directly in the database
-      const note = await db.note.create({
-        data: {
+      const response = await fetch("/api/notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           title,
           content,
           isPublic,
           isPinned,
-          userId: session.user.id,
           categoryId: categoryId === "none" ? null : categoryId || null,
-        },
+        }),
       });
 
-      // Redirect to the note page with success parameter
-      redirect(`/dashboard/notes/${note.id}?created=true`);
+      if (response.ok) {
+        const data = await response.json();
+        window.location.href = `/dashboard/notes/${data.id}?created=true`;
+      } else {
+        window.location.href = "/dashboard/notes/new?error=true";
+      }
     } catch (error) {
       console.error("Error creating note:", error);
-      redirect("/dashboard/notes/new?error=true");
+      window.location.href = "/dashboard/notes/new?error=true";
     }
   }
 
   return (
-    <div className="container mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <div className="container mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       <div className="mb-8">
         <Link href="/dashboard">
           <Button variant="ghost" className="pl-0">
@@ -117,87 +225,28 @@ export default async function NewNotePage({
         </p>
       </div>
 
-      <Card className="mx-auto max-w-2xl shadow">
-        <CardHeader>
-          <h2 className="text-xl font-semibold">Note Details</h2>
-        </CardHeader>
-        <CardContent>
-          <form action={createNote} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                name="title"
-                placeholder="Enter note title"
-                required
-                className="w-full"
-              />
-            </div>
+      {hasError && (
+        <div className="bg-destructive/10 text-destructive mb-6 flex items-center gap-2 rounded-lg p-4">
+          <AlertCircle className="h-5 w-5" />
+          <p className="text-sm font-medium">
+            Something went wrong while creating your note. Please try again.
+          </p>
+        </div>
+      )}
 
-            <div className="space-y-2">
-              <Label htmlFor="content">Content</Label>
-              <Textarea
-                id="content"
-                name="content"
-                placeholder="Write your note here..."
-                className="min-h-[300px] w-full resize-none"
-                required
-              />
-            </div>
+      <div className="bg-card overflow-hidden rounded-lg border shadow-sm">
+        <div className="bg-muted/40 border-b px-6 py-4">
+          <h2 className="text-lg font-medium">Note Details</h2>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="categoryId">Category</Label>
-              <Select
-                name="categoryId"
-                defaultValue={
-                  preselectedCategory ? preselectedCategory.id : "none"
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="h-2 w-2 rounded-full"
-                          style={{
-                            backgroundColor: category.color || "#94a3b8",
-                          }}
-                        />
-                        {category.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {preselectedCategory && (
-                <p className="text-muted-foreground text-xs">
-                  Pre-selected category: {preselectedCategory.name}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-8">
-              <div className="flex items-center space-x-2">
-                <Switch id="isPublic" name="isPublic" />
-                <Label htmlFor="isPublic">Make this note public</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch id="isPinned" name="isPinned" />
-                <Label htmlFor="isPinned">Pin this note</Label>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button type="submit">Create Note</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+        <div className="p-6">
+          <NoteForm
+            createNote={createNote}
+            categories={categories}
+            preselectedCategory={preselectedCategory}
+          />
+        </div>
+      </div>
     </div>
   );
 }
