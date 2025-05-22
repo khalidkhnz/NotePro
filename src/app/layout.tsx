@@ -30,7 +30,7 @@ export default function RootLayout({
         <TRPCReactProvider>
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
+            defaultTheme="dark"
             enableSystem
             disableTransitionOnChange
           >
