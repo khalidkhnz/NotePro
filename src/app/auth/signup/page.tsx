@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { z } from "zod";
-import { BookText, AlertCircle, Loader2 } from "lucide-react";
+import {
+  BookText,
+  AlertCircle,
+  Loader2,
+  Mail,
+  MessageCircle,
+} from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { useEffect, useState } from "react";
 
@@ -57,7 +63,35 @@ function DiscordButton() {
           Connecting...
         </>
       ) : (
-        "Discord"
+        <>
+          <MessageCircle className="mr-2 h-4 w-4" />
+          Discord
+        </>
+      )}
+    </Button>
+  );
+}
+
+function GoogleButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button
+      className="w-full"
+      variant="outline"
+      type="submit"
+      disabled={pending}
+    >
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Connecting...
+        </>
+      ) : (
+        <>
+          <Mail className="mr-2 h-4 w-4" />
+          Google
+        </>
       )}
     </Button>
   );
@@ -187,6 +221,22 @@ export default function SignUpPage() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    try {
+      const response = await fetch("/api/auth/google");
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setErrorMessage("Could not sign in with Google. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error signing in with Google:", error);
+      setErrorMessage("Something went wrong. Please try again later.");
+    }
+  }
+
   return (
     <div className="bg-background flex min-h-screen w-full items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md shadow-lg">
@@ -266,6 +316,10 @@ export default function SignUpPage() {
 
           <form action={handleDiscordSignIn}>
             <DiscordButton />
+          </form>
+
+          <form action={handleGoogleSignIn}>
+            <GoogleButton />
           </form>
         </CardContent>
         <CardFooter className="flex justify-center px-6 pb-6">
