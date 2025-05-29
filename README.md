@@ -23,6 +23,68 @@ This application now uses **MongoDB** instead of SQLite. You'll need to set up M
    NODE_ENV="development"
    ```
 
+## Authentication Setup
+
+This application supports multiple authentication methods:
+
+### Google OAuth Setup
+
+1. **Create Google OAuth Credentials**:
+
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the Google+ API
+   - Go to "Credentials" → "Create Credentials" → "OAuth client ID"
+   - Select "Web application"
+   - Add authorized redirect URIs:
+     - `http://localhost:3000/api/auth/callback/google` (for development)
+     - `https://yourdomain.com/api/auth/callback/google` (for production)
+
+2. **Add Google credentials to environment**:
+   ```bash
+   # Add to your .env.local file:
+   AUTH_GOOGLE_ID="your-google-client-id"
+   AUTH_GOOGLE_SECRET="your-google-client-secret"
+   ```
+
+### Discord OAuth Setup (Optional)
+
+1. **Create Discord Application**:
+
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   - Create a new application
+   - Go to "OAuth2" settings
+   - Add redirect URI: `http://localhost:3000/api/auth/callback/discord`
+
+2. **Add Discord credentials to environment**:
+   ```bash
+   # Add to your .env.local file:
+   AUTH_DISCORD_ID="your-discord-client-id"
+   AUTH_DISCORD_SECRET="your-discord-client-secret"
+   ```
+
+### Complete Environment File Example
+
+```bash
+# Database
+DATABASE_URL="mongodb://localhost:27017/notepro"
+
+# Authentication
+AUTH_SECRET="your-random-secret-here"
+AUTH_TRUST_HOST="http://localhost:3000"
+
+# Google OAuth (required for Google sign-in)
+AUTH_GOOGLE_ID="your-google-client-id"
+AUTH_GOOGLE_SECRET="your-google-client-secret"
+
+# Discord OAuth (optional)
+AUTH_DISCORD_ID="your-discord-client-id"
+AUTH_DISCORD_SECRET="your-discord-client-secret"
+
+# Environment
+NODE_ENV="development"
+```
+
 3. **Generate Prisma client and push schema**:
 
    ```bash
